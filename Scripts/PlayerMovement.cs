@@ -4,22 +4,49 @@ using UnityEngine;
 using System.IO;
 using UnityEditor;
 using UnityEngine.SceneManagement;
+using System.Threading.Tasks;
+using System;
+using UnityEngine.UI;
 
 public class PlayerMovement : MonoBehaviour
 {
     private Transform _transform;
     private Animator _animator;
+    private Rigidbody2D _rb;
 
     private SpriteRenderer _spr;
+    public GameObject _backgroundGO;
+    private Renderer _renderer;
+
+    public FixedJoystick Joystick;
+
+    private Vector2 move;
 
     public int score;
+    private GameObject _bot;
 
     [SerializeField] private GameObject _bullet;
+    [SerializeField] private HealthHandle _healthHandle;
+
     [SerializeField] private float _speed = 0.01f;
-    [SerializeField] private int health = 5;
+
+    [SerializeField] private int _health = 10;
+    [SerializeField] private int _current_health = 10;
+    [SerializeField] private float _scope = 10f;
+
+    [SerializeField] private Text _coint_text;
+    [SerializeField] private float _speed_shot = 3;
 
     private float pos_x;
     private float pos_y;
+
+    private bool _spawn_enemy = true;
+    private bool _fire_ready = true;
+
+    private int money = 0;
+    private float distance = 100f;
+
+    //private Vector3 _mousePosition;
 
     // Start is called before the first frame update
     void Start()
@@ -27,90 +54,148 @@ public class PlayerMovement : MonoBehaviour
         _transform = GetComponent<Transform>();
         _spr = GetComponent<SpriteRenderer>();
         _animator = GetComponent<Animator>();
-        pos_x = _transform.position.x;
-        pos_y = _transform.position.y;
+        _rb = GetComponent<Rigidbody2D>();
+        _renderer = _backgroundGO.GetComponent<Renderer>();
+
+        /*pos_x = _transform.position.x;
+        pos_y = _transform.position.y;*/
+
         score = 0;
 
         _animator.SetBool("running", false);
+        _healthHandle.SetMaxHealth(_health);
     }
 
     // Update is called once per frame
     void Update()
     {
-        _transform.position = new Vector2(pos_x, pos_y);
-        Movement();
-        Shoot();
+        move.x = Joystick.Horizontal;
+        move.y = Joystick.Vertical;
+
+        /*_rb.velocity = new Vector2(pos_x, pos_y);
+        Movement();*/
+        CheckShoot();
     }
 
-    private void Movement()
+    private void FixedUpdate()
     {
+        if (move.x < 0)
+        {
+            _spr.flipX = true;
+
+            _animator.SetBool("running", true);
+        }
+        else if (move.x > 0)
+        {
+            _spr.flipX = false;
+
+            _animator.SetBool("running", true);
+        }
+        else
+        {
+            _animator.SetBool("running", false);
+        }
+
+        _rb.MovePosition(_rb.position + move * _speed * Time.fixedDeltaTime);
+    }
+
+    /*private void Movement()
+    {
+
         if (Input.GetKey("a"))
         {
-            if (!(pos_x <= -13.5f))
-            {
-                pos_x -= _speed;
-                _spr.flipX = true;
-            }
+            pos_x = -_speed;
+            _spr.flipX = true;
 
             _animator.SetBool("running", true);
         }
         else if (Input.GetKey("d"))
         {
-            if (!(pos_x >= 13.5f))
-            {
-                pos_x += _speed;
-                _spr.flipX = false;
-            }
+
+            pos_x = _speed;
+            _spr.flipX = false;
 
             _animator.SetBool("running", true);
+        } else
+        {
+            pos_x = 0;
         }
 
         if (Input.GetKey("w"))
         {
-            if (!(pos_y >= 4.4f))
-            {
-                pos_y += _speed;
-            }
+            pos_y = _speed;
 
             _animator.SetBool("running", true);
         }
         else if (Input.GetKey("s"))
         {
-            if (!(pos_y <= -4.3f))
-            {
-                pos_y -= _speed;
-            }
+            pos_y = -_speed;
 
             _animator.SetBool("running", true);
+        } else
+        {
+            pos_y = 0;
         }
 
         if (!Input.GetKey("a") && !Input.GetKey("d") && !Input.GetKey("w") && !Input.GetKey("s"))
         {
             _animator.SetBool("running", false);
         }
-    }
 
-    private void Shoot()
+        if (_speed == 0)
+        {
+            _animator.SetBool("running", true);
+        }
+
+    }*/
+
+    private void CheckShoot()
     {
-        GameObject go = null;
-        float distance = 20f;
+        bool count_bot = false;
+
         foreach (var gameObj in FindObjectsOfType(typeof(GameObject)) as GameObject[])
         {
             if (gameObj.name == "Bot")
             {
-                if (Vector3.Distance(_transform.position, gameObj.transform.position) < distance)
-                {
-                    go = gameObj;
-                    distance = Vector3.Distance(_transform.position, gameObj.transform.position);
-                }
+                count_bot = true;
             }
         }
 
-        GameObject _bot = go;
-
-        if (_bot != null)
+        if (!count_bot && GameObject.Find("SpawnPoint") == null)
         {
-            if (Input.GetKeyDown("space"))
+            WarnToSpawn();
+        }
+    }
+
+    private void FireCountDown()
+    {
+        _fire_ready = true;
+    }
+
+    public void Shoot()
+    {
+        if (_fire_ready)
+        {
+            GameObject go = null;
+            bool hasEnemy = false;
+            distance = 100f;
+
+            foreach (var gameObj in FindObjectsOfType(typeof(GameObject)) as GameObject[])
+            {
+                if (gameObj.name == "Bot")
+                {
+                    hasEnemy = true;
+                    if (Vector3.Distance(_transform.position, gameObj.transform.position) < distance)
+                    {
+                        go = gameObj;
+                        distance = Vector3.Distance(_transform.position, gameObj.transform.position);
+                    }
+                }
+            }
+
+            _bot = go;
+
+            if (hasEnemy && _bot != null)
             {
                 GameObject pNewObject = Instantiate(_bullet, _transform.position, Quaternion.identity);
 
@@ -118,10 +203,8 @@ public class PlayerMovement : MonoBehaviour
 
                 pNewObject.GetComponent<Fire>().ShootDir(shootDir);
             }
-        }
-        else if (GameObject.Find("SpawnPoint") == null)
-        {
-            WarnToSpawn();
+            _fire_ready = false;
+            Invoke("FireCountDown", _speed_shot);
         }
     }
 
@@ -129,17 +212,28 @@ public class PlayerMovement : MonoBehaviour
     {
         if (collider.CompareTag("Bot"))
         {
-            if (health > 1)
+            if (_current_health > 1)
             {
-                health -= 1;
+                _current_health -= 1;
+                _healthHandle.SetHealth(_current_health);
                 StartCoroutine(Hit());
             }
             else
             {
-                Destroy(this.gameObject);
-                RestartLevel();
+                SceneManager.LoadScene(3);
             }
         }
+
+        if (collider.CompareTag("Coin"))
+        {
+            money += 1;
+            CoinNumber(money);
+        }
+    }
+
+    private void CoinNumber(int coin)
+    {
+        _coint_text.text = coin.ToString();
     }
 
     IEnumerator Hit()
@@ -167,11 +261,18 @@ public class PlayerMovement : MonoBehaviour
     {
         for (int i = 0; i < System.Int32.Parse((score / 2).ToString()) + 1; i++)
         {
-            GameObject _spawn_point = (GameObject)LoadPrefabFromFile("SpawnPoint");
 
-            float random_x = Random.Range(-13f, 13f);
+            // Load a prefab from the "Resources" folder
+            GameObject _spawn_point = Resources.Load<GameObject>("SpawnPoint");
 
-            float random_y = Random.Range(-4.5f, 4.5f);
+            Vector3[] corners = new Vector3[2];
+
+            corners[0] = _renderer.bounds.min;
+            corners[1] = _renderer.bounds.max;
+
+            float random_x = UnityEngine.Random.Range((corners[0].x) + 0.5f, (corners[1].x) - 0.5f);
+
+            float random_y = UnityEngine.Random.Range((corners[0].y) + 0.5f, (corners[1].y) - 0.5f);
 
             GameObject pNewObject =
                 (GameObject)Instantiate(_spawn_point, new Vector3(random_x, random_y, 0), Quaternion.identity);
@@ -180,21 +281,5 @@ public class PlayerMovement : MonoBehaviour
 
             pNewObject.GetComponent<SpawnEnemy>().Setup(new Vector3(random_x, random_y, 0));
         }
-    }
-
-    private UnityEngine.Object LoadPrefabFromFile(string filename)
-    {
-        var loadedObject = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/" + filename + ".prefab");
-        if (loadedObject == null)
-        {
-            throw new FileNotFoundException("...no file found - please check the configuration");
-        }
-
-        return loadedObject;
-    }
-
-    void RestartLevel() //Restarts the level
-    {
-        SceneManager.LoadScene(SceneManager.GetActiveScene().name);
     }
 }
