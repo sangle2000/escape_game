@@ -17,6 +17,8 @@ public class PlayerMovement : MonoBehaviour
     private SpriteRenderer _spr;
     public GameObject _backgroundGO;
     private Renderer _renderer;
+    public AudioSource audioSource;
+    public AudioClip audioClip;
 
     public FixedJoystick Joystick;
 
@@ -24,6 +26,7 @@ public class PlayerMovement : MonoBehaviour
 
     public int score;
     private GameObject _bot;
+    private GameObject _joy_stick;
 
     [SerializeField] private GameObject _bullet;
     [SerializeField] private HealthHandle _healthHandle;
@@ -32,7 +35,7 @@ public class PlayerMovement : MonoBehaviour
 
     [SerializeField] private int _health = 10;
     [SerializeField] private int _current_health = 10;
-    [SerializeField] private float _scope = 10f;
+    [SerializeField] private float _scope = 3f;
 
     [SerializeField] private Text _coint_text;
     [SerializeField] private float _speed_shot = 3;
@@ -42,6 +45,8 @@ public class PlayerMovement : MonoBehaviour
 
     private bool _spawn_enemy = true;
     private bool _fire_ready = true;
+    private bool _check_dame = true;
+    private bool _check_joystick = true;
 
     private int money = 0;
     private float distance = 100f;
@@ -57,6 +62,8 @@ public class PlayerMovement : MonoBehaviour
         _rb = GetComponent<Rigidbody2D>();
         _renderer = _backgroundGO.GetComponent<Renderer>();
 
+        _joy_stick = GameObject.Find("Fixed Joystick");
+
         /*pos_x = _transform.position.x;
         pos_y = _transform.position.y;*/
 
@@ -64,6 +71,9 @@ public class PlayerMovement : MonoBehaviour
 
         _animator.SetBool("running", false);
         _healthHandle.SetMaxHealth(_health);
+
+        audioSource.Stop();
+
     }
 
     // Update is called once per frame
@@ -79,24 +89,28 @@ public class PlayerMovement : MonoBehaviour
 
     private void FixedUpdate()
     {
-        if (move.x < 0)
+        if (_check_joystick)
         {
-            _spr.flipX = true;
+            if (move.x < 0)
+            {
+                _spr.flipX = true;
 
-            _animator.SetBool("running", true);
-        }
-        else if (move.x > 0)
-        {
-            _spr.flipX = false;
+                _animator.SetBool("running", true);
+            }
+            else if (move.x > 0)
+            {
+                _spr.flipX = false;
 
-            _animator.SetBool("running", true);
-        }
-        else
-        {
-            _animator.SetBool("running", false);
-        }
+                _animator.SetBool("running", true);
+            }
+            else
+            {
+                _animator.SetBool("running", false);
+            }
 
-        _rb.MovePosition(_rb.position + move * _speed * Time.fixedDeltaTime);
+            _rb.MovePosition(_rb.position + move * _speed * Time.fixedDeltaTime);
+        } 
+        
     }
 
     /*private void Movement()
@@ -195,33 +209,48 @@ public class PlayerMovement : MonoBehaviour
 
             _bot = go;
 
-            if (hasEnemy && _bot != null)
+            if (hasEnemy && _bot != null && distance <= _scope)
             {
+                audioSource.Play();
+
                 GameObject pNewObject = Instantiate(_bullet, _transform.position, Quaternion.identity);
 
                 Vector3 shootDir = (_transform.position - _bot.transform.position).normalized;
 
                 pNewObject.GetComponent<Fire>().ShootDir(shootDir);
+
+                _fire_ready = false;
+
+                Invoke("FireCountDown", _speed_shot);
             }
-            _fire_ready = false;
-            Invoke("FireCountDown", _speed_shot);
         }
     }
 
-    private void OnTriggerEnter2D(Collider2D collider)
+    private void DamageEnemy()
+    {
+        _check_dame = true;
+    }
+
+    private void OnTriggerStay2D(Collider2D collider)
     {
         if (collider.CompareTag("Bot"))
         {
-            if (_current_health > 1)
+            if (_check_dame)
             {
-                _current_health -= 1;
-                _healthHandle.SetHealth(_current_health);
-                StartCoroutine(Hit());
+                if (_current_health > 1)
+                {
+                    _current_health -= 1;
+                    _healthHandle.SetHealth(_current_health);
+                    StartCoroutine(Hit());
+                    _check_dame = false;
+                    Invoke("DamageEnemy", 2);
+                }
+                else
+                {
+                    SceneManager.LoadScene(3);
+                }
             }
-            else
-            {
-                SceneManager.LoadScene(3);
-            }
+            
         }
 
         if (collider.CompareTag("Coin"))
