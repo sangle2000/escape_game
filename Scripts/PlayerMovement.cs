@@ -252,7 +252,9 @@ public class PlayerMovement : MonoBehaviour
             }
             
         }
-
+    }
+    private void OnTriggerEnter2D(Collider2D collider)
+    {
         if (collider.CompareTag("Coin"))
         {
             money += 1;
